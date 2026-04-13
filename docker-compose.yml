@@ -1,0 +1,35 @@
+services:
+  api:
+    build: .
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      DATA_DIR: /data
+      CHROMA_PATH: /data/chroma_db
+      SQLITE_PATH: /data/sessions.db
+      SAMPLE_DOCS_DIR: /app/data/sample_docs
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      WORKING_MEMORY_TOKEN_BUDGET: ${WORKING_MEMORY_TOKEN_BUDGET:-2000}
+    volumes:
+      - research_data:/data
+
+  n8n:
+    image: n8nio/n8n:latest
+    depends_on:
+      - api
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  research_data:
+  n8n_data:
