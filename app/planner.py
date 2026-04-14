@@ -2,34 +2,19 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from app.config import get_settings
-from app.grounded_synthesis import sanitize_subqueries, strip_subquery_prefixes
+from app.evidence_clean import collapse_repeated_punctuation
+from app.grounded_synthesis import (
+    intent_aware_fallback_subqueries,
+    is_cleaned_original_passthrough,
+    query_is_control_focused,
+    sanitize_subqueries,
+    strip_subquery_prefixes,
+    subqueries_quality_poor,
+)
 from app.llm import LLMProvider, get_llm_provider
-
-
-def _fallback_subqueries(original: str, max_n: int) -> list[str]:
-    """Deterministic split when LLM output is unusable."""
-    cleaned = original.strip()
-    if not cleaned:
-        return []
-    # Split on numbered list or semicolons
-    parts = re.split(r"(?:\n|^)\s*\d+[\).]\s+", cleaned)
-    if len(parts) > 1:
-        out = [p.strip() for p in parts if len(p.strip()) > 5]
-        return out[:max_n]
-    parts = [p.strip() for p in re.split(r"[;\n]+", cleaned) if len(p.strip()) > 10]
-    if len(parts) >= 2:
-        return parts[:max_n]
-    # Single question → three angles
-    base = cleaned[:200]
-    return [
-        f"What definitions and background apply to: {base}?",
-        f"What mechanisms, processes, or constraints are described regarding: {base}?",
-        f"What outcomes, risks, or recommendations are stated about: {base}?",
-    ][:max_n]
 
 
 def decompose_query(original_query: str, llm: LLMProvider | None = None) -> list[str]:
@@ -42,9 +27,11 @@ def decompose_query(original_query: str, llm: LLMProvider | None = None) -> list
     llm = llm or get_llm_provider()
 
     system = (
-        "You decompose research questions into focused subqueries. "
-        "Return ONLY valid JSON: {\"subqueries\": [string, ...]} with at most "
-        f"{max_n} items. Each subquery must be self-contained and specific."
+        "You decompose research questions into short, natural subqueries for retrieval. "
+        "Each subquery must be a standalone question or focused search phrase (not a meta wrapper). "
+        "Avoid generic templates like 'What definitions and background apply to...'. "
+        "Prefer concrete angles (technical controls, governance, risks, requirements). "
+        f"Return ONLY valid JSON: {{\"subqueries\": [string, ...]}} with at most {max_n} items."
     )
     user = f"Original question:\n{original_query}\n"
 
@@ -55,17 +42,30 @@ def decompose_query(original_query: str, llm: LLMProvider | None = None) -> list
         data = {}
 
     raw_list = data.get("subqueries")
-    subqueries: list[str] = []
+    raw_subqueries: list[str] = []
     if isinstance(raw_list, list):
         for item in raw_list:
             if isinstance(item, str):
-                subqueries.append(item)
+                raw_subqueries.append(item)
 
-    subqueries = sanitize_subqueries(subqueries, original_query, max_n)
+    cleaned_original = collapse_repeated_punctuation(strip_subquery_prefixes(original_query))
+
+    subqueries = sanitize_subqueries(raw_subqueries, original_query, max_n)
+
     if len(subqueries) < 1:
-        cleaned = strip_subquery_prefixes(original_query)
-        subqueries = _fallback_subqueries(cleaned, max_n)
-        subqueries = sanitize_subqueries(subqueries, cleaned, max_n)
-    if len(subqueries) < 1 and strip_subquery_prefixes(original_query):
-        subqueries = [strip_subquery_prefixes(original_query)][:max_n]
+        subqueries = intent_aware_fallback_subqueries(cleaned_original, max_n)
+        subqueries = sanitize_subqueries(subqueries, cleaned_original, max_n)
+    elif subqueries_quality_poor(subqueries, original_query):
+        subqueries = intent_aware_fallback_subqueries(cleaned_original, max_n)
+        subqueries = sanitize_subqueries(subqueries, cleaned_original, max_n)
+    elif (
+        query_is_control_focused(original_query)
+        and is_cleaned_original_passthrough(subqueries, cleaned_original)
+    ):
+        subqueries = intent_aware_fallback_subqueries(cleaned_original, max_n)
+        subqueries = sanitize_subqueries(subqueries, cleaned_original, max_n)
+
+    if len(subqueries) < 1 and cleaned_original and len(cleaned_original) >= 8:
+        subqueries = [cleaned_original][:max_n]
+
     return subqueries[:max_n]

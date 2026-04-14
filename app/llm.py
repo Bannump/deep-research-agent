@@ -10,6 +10,8 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.evidence_clean import collapse_repeated_punctuation
+from app.grounded_synthesis import intent_aware_fallback_subqueries, strip_subquery_prefixes
 from app.utils import normalize_ws
 
 
@@ -59,15 +61,14 @@ class MockLLMProvider(LLMProvider):
         if "subqueries" in sys_l or "decompose" in sys_l:
             body = _extract_question_body(user)
             parts = re.split(r"[;\n]+", body)
-            parts = [normalize_ws(p) for p in parts if len(normalize_ws(p)) > 10][:3]
-            if len(parts) < 2:
-                base = body[:200] if body else user[:200]
-                parts = [
-                    f"What definitions and background apply to: {base}?",
-                    f"What mechanisms, processes, or constraints are described regarding: {base}?",
-                    f"What outcomes, risks, or recommendations are stated about: {base}?",
-                ]
-            return json.dumps({"subqueries": parts[:3]})
+            parts = [collapse_repeated_punctuation(normalize_ws(p)) for p in parts if len(normalize_ws(p)) > 10][:3]
+            if len(parts) >= 2:
+                return json.dumps({"subqueries": parts[:3]})
+            cleaned = collapse_repeated_punctuation(strip_subquery_prefixes(body)) if body else ""
+            if not cleaned:
+                cleaned = collapse_repeated_punctuation(normalize_ws(user))[:220]
+            intent = intent_aware_fallback_subqueries(cleaned, 3)
+            return json.dumps({"subqueries": intent})
         # Answers use grounded extraction when this provider is selected; this branch is unused.
         return (
             "MockLLM: use grounded synthesis for subquery/final answers "

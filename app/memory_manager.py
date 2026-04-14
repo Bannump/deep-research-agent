@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from app.config import get_settings
-from app.grounded_synthesis import grounded_episodic_summary
+from app.grounded_synthesis import grounded_episodic_summary, strip_user_facing_subquery_labels
 from app.llm import LLMProvider, MockLLMProvider, get_llm_provider
 from app.retriever import RetrievedChunk
 from app.utils import chunk_text_similarity_key, estimate_tokens, normalize_ws
@@ -117,20 +117,35 @@ class MemoryManager:
         subquery: str,
         answer: str,
         llm: LLMProvider | None = None,
+        prior_episodic: list[str] | None = None,
     ) -> str:
         """Compress subquery outcome into a short episodic note for SQLite."""
         llm = llm or get_llm_provider()
         if isinstance(llm, MockLLMProvider):
-            return grounded_episodic_summary(subquery, answer)
+            return grounded_episodic_summary(subquery, answer, prior_episodic=prior_episodic)
 
         system = (
             "Summarize the subquery result in 1-2 concise sentences for episodic memory. "
             "Shorter than the full answer. No bullet points. "
-            "Keep concrete nouns (products, standards, control types). Do not add new facts."
+            "Write polished analyst-style prose: one compressed takeaway per note, not internal scaffolding. "
+            "Never include bracketed subquery labels like [What ...?] or repeat the subquery text as a prefix. "
+            "Keep concrete nouns (products, standards, control types). Do not add new facts. "
+            "Do not repeat the same summary as prior subquery notes; preserve this subquery's distinct angle."
         )
-        user = f"Subquery: {subquery}\nAnswer:\n{answer[:4000]}\n"
+        prior_block = ""
+        if prior_episodic:
+            prior_block = "Prior episodic notes (avoid near-duplicates):\n" + "\n".join(
+                f"- {p[:500]}" for p in prior_episodic[-6:]
+            )
+        user = (
+            f"{prior_block}\n\nSubquery: {subquery}\nAnswer:\n{answer[:4000]}\n"
+            if prior_block
+            else f"Subquery: {subquery}\nAnswer:\n{answer[:4000]}\n"
+        )
         try:
-            out = normalize_ws(llm.complete_text(system, user, max_tokens=256))
+            out = strip_user_facing_subquery_labels(
+                normalize_ws(llm.complete_text(system, user, max_tokens=256))
+            )
             return out[:1200]
         except Exception:
-            return grounded_episodic_summary(subquery, answer)
+            return grounded_episodic_summary(subquery, answer, prior_episodic=prior_episodic)

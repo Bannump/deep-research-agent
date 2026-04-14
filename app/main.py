@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app import __version__
 from app.config import get_settings
+from app.evidence_clean import clean_chunk_for_synthesis
 from app.db import get_db_session, get_session_factory, init_db
 from app.evaluator import (
     build_pipeline_demonstration,
@@ -192,10 +193,11 @@ def _run_pipeline(original_query: str) -> ResearchResponse:
         )
         subquery_prompt_token_list.append(sq_tokens)
 
-        epi = memory.summarize_episodic(sq, sub_ans, llm=llm)
+        epi = memory.summarize_episodic(sq, sub_ans, llm=llm, prior_episodic=list(episodic_notes))
         episodic_notes.append(epi)
         for c in wm.retained[:4]:
-            evidence_for_final.append(f"[{c.source}]\n{c.text[:800]}")
+            cleaned = clean_chunk_for_synthesis(c.text) or c.text
+            evidence_for_final.append(f"[{c.source}]\n{cleaned[:800]}")
 
         log_action(
             "episodic",

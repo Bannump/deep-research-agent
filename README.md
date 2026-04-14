@@ -121,7 +121,7 @@ curl -s -X POST http://localhost:8000/research ^
 ```bash
 curl -s -X POST http://localhost:8000/research \
   -H "Content-Type: application/json" \
-  -d '{"query": "What is the Aurora Compliance Framework? What technical controls are required for encryption and logging? What risks are called out?"}'
+  -d '{"query": "What are the key controls in the sample corpus"}'
 ```
 
 The JSON is optimized for reviewers:
