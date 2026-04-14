@@ -48,6 +48,24 @@ Copy `.env.example` to `.env` and adjust:
 
 Token counts are **approximate** (~4 characters per token); cost is **linear in estimated tokens** and intended for comparison, not billing.
 
+## Run with Docker Compose (Recommended)
+
+Docker Compose is the recommended way to run this project because it brings up the API and n8n together with consistent defaults.
+
+No `.env` file is required. Compose reads defaults from `docker-compose.yml`; optionally create `.env` in the same directory to set `API_PORT`, `N8N_PORT`, `LLM_PROVIDER`, or API keys, or run:
+
+`docker compose --env-file .env up --build`
+
+```bash
+cd binox-g3-research-agent
+docker compose up --build
+```
+
+- API: `http://localhost:8000` (host port from `API_PORT`, default `8000`)
+- n8n UI: `http://localhost:5678` (host port from `N8N_PORT`, default `5678`)
+
+The API container stores SQLite + Chroma in the `research_data` volume under `/data`.
+
 ## Run locally (Python)
 
 From the project root (`binox-g3-research-agent`):
@@ -81,22 +99,6 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 First run indexes `data/sample_docs` into Chroma. With default settings, Chroma may download its **default embedding model** once (requires network the first time). For fully offline tests, set `USE_MOCK_EMBEDDINGS=1`.
 
 **Adding or replacing corpus files:** Remove the persisted Chroma directory (`data/chroma_db` locally, or the Docker volume data) so the collection is rebuilt on next startup; otherwise old embeddings may linger.
-
-## Run with Docker Compose
-
-No `.env` file is required. Compose reads defaults from `docker-compose.yml`; optionally create `.env` in the same directory to set `API_PORT`, `N8N_PORT`, `LLM_PROVIDER`, or API keys, or run:
-
-`docker compose --env-file .env up --build`
-
-```bash
-cd binox-g3-research-agent
-docker compose up --build
-```
-
-- API: `http://localhost:8000` (host port from `API_PORT`, default `8000`)
-- n8n UI: `http://localhost:5678` (host port from `N8N_PORT`, default `5678`)
-
-The API container stores SQLite + Chroma in the `research_data` volume under `/data`.
 
 ## API usage
 
