@@ -39,3 +39,21 @@ def test_research_pipeline_smoke() -> None:
         body = g.json()
         assert body["session_id"] == sid
         assert body["subquery_results"]
+
+
+def test_research_subqueries_not_wrapper_templates() -> None:
+    with TestClient(app) as client:
+        r = client.post(
+            "/research",
+            json={"query": "What are the key controls in the sample corpus?"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        for sq in data["subqueries"]:
+            low = sq.lower()
+            assert "definitions and background apply" not in low
+            assert "mechanisms, processes, or constraints are described regarding" not in low
+        assert "##" not in data["final_answer"]
+        assert "[Mock answer]" not in data["final_answer"]
+        assert "[What" not in data["final_answer"]
+        assert not any("[What" in s for s in data["episodic_summaries"])
