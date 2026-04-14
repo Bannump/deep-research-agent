@@ -13,6 +13,13 @@ from app.config import get_settings
 from app.utils import normalize_ws
 
 
+def _extract_question_body(user: str) -> str:
+    m = re.search(r"(?is)original\s+question:\s*(.*)", user)
+    if m:
+        return m.group(1).strip()
+    return user.strip()
+
+
 class LLMProvider(ABC):
     """Vendor-agnostic completion interface."""
 
@@ -48,21 +55,23 @@ class MockLLMProvider(LLMProvider):
 
     def complete_text(self, system: str, user: str, max_tokens: int = 1024) -> str:
         _ = (system, max_tokens)
-        u = user.lower()
-        if "subqueries" in system.lower() or "decompose" in system.lower():
-            parts = re.split(r"[;\n]+", user)
+        sys_l = system.lower()
+        if "subqueries" in sys_l or "decompose" in sys_l:
+            body = _extract_question_body(user)
+            parts = re.split(r"[;\n]+", body)
             parts = [normalize_ws(p) for p in parts if len(normalize_ws(p)) > 10][:3]
             if len(parts) < 2:
+                base = body[:200] if body else user[:200]
                 parts = [
-                    f"What background context applies: {user[:80]}?",
-                    f"What mechanisms or constraints are described: {user[:80]}?",
-                    f"What conclusions or recommendations appear: {user[:80]}?",
+                    f"What definitions and background apply to: {base}?",
+                    f"What mechanisms, processes, or constraints are described regarding: {base}?",
+                    f"What outcomes, risks, or recommendations are stated about: {base}?",
                 ]
             return json.dumps({"subqueries": parts[:3]})
-        # Subquery answer
+        # Answers use grounded extraction when this provider is selected; this branch is unused.
         return (
-            "[Mock answer] Based on the retained evidence snippets, the corpus discusses "
-            "related themes; specifics depend on source filenames cited in context."
+            "MockLLM: use grounded synthesis for subquery/final answers "
+            "(complete_text is only wired for decomposition JSON)."
         )
 
     def complete_json(self, system: str, user: str, max_tokens: int = 1024) -> dict[str, Any]:
