@@ -23,6 +23,7 @@ A **constrained research pipeline** (not a free-form chat agent) that answers mu
 - **Retriever** (`app/retriever.py`) chunks `data/sample_docs`, embeds (Chroma default or mock for tests), returns up to **8** candidates per subquery.
 - **Memory manager** (`app/memory_manager.py`) enforces caps, assigns **discard reasons** (`low_relevance`, `duplicate`, `memory_limit`, `chunk_limit`), and writes episodic summaries.
 - **Synthesizer** (`app/synthesizer.py`) answers subqueries from retained evidence and builds the final answer from episodic notes + short evidence excerpts.
+- **Grounded synthesis** (`app/grounded_synthesis.py`) provides deterministic, extractive answers when `LLM_PROVIDER=mock` (or when API keys are missing so the mock provider is used): subquery answers and final synthesis quote actual retained text; subqueries are **sanitized** (prefix labels and duplicates removed).
 - **LLM** (`app/llm.py`) uses a small **provider interface** (`mock` by default, optional OpenAI / Anthropic via env).
 
 See [architecture.md](./architecture.md) for diagrams and data flow.
@@ -152,7 +153,7 @@ Recent sessions with **`query_preview`**, optional **`subquery_count`**, and a o
 }
 ```
 
-With **`LLM_PROVIDER=mock`**, subqueries and prose are deterministic templates, but the **structure** is the same as with a real provider: you still see retrieval counts, **`discarded_chunks`** with reasons, **`episodic_summaries`**, and **`demonstration`** explaining the three memory stages.
+With **`LLM_PROVIDER=mock`**, decomposition still uses a small JSON template from the mock provider, but **answers are not placeholders**: they are **grounded extractive summaries** from retained chunks (plus structured final synthesis). The **structure** matches a real provider: retrieval counts, **`discarded_chunks`** with reasons, shorter **`episodic_summaries`**, and **`demonstration`** explaining the three memory stages.
 
 **Abbreviated response (illustrative)**
 
@@ -176,13 +177,13 @@ With **`LLM_PROVIDER=mock`**, subqueries and prose are deterministic templates, 
       "discarded_count": 4,
       "retained_snippets": [{ "chunk_id": "…", "source": "01_overview.md", "text_preview": "…" }],
       "discarded_chunks": [{ "chunk_id": "…", "source": "…", "reason": "chunk_limit", "detail": "…" }],
-      "subquery_answer": "[Mock answer] …",
-      "episodic_summary": "…",
+      "subquery_answer": "From the retained excerpts… - … [01_overview.md]",
+      "episodic_summary": "[What principles…] …",
       "working_memory_tokens": 123
     }
   ],
   "episodic_summaries": ["…", "…", "…"],
-  "final_answer": "[Fallback synthesis] …",
+  "final_answer": "**Direct answer:** …\\n\\n**Supporting details…**",
   "session_metrics": {
     "subquery_count": 3,
     "chunks_retrieved_total": 24,

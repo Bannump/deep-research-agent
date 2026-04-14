@@ -30,6 +30,7 @@ flowchart LR
 | `retriever.py` | Chunk corpus, index/query Chroma |
 | `memory_manager.py` | Token estimate, dedupe, prune, discard reasons, episodic summary |
 | `synthesizer.py` | Subquery answers + final synthesis |
+| `grounded_synthesis.py` | Deterministic extractive answers when the mock provider is active |
 | `llm.py` | Provider abstraction (`mock`, OpenAI, Anthropic) |
 | `db.py` / `models.py` | SQLite persistence for sessions and memory actions |
 | `evaluator.py` | Token/cost rollups, `SessionMetrics`, pipeline demonstration copy |
@@ -42,7 +43,7 @@ flowchart LR
    - Retrieve up to 8 chunks from Chroma.
    - Sort by score; remove near-duplicates.
    - Greedy pack into ≤4 chunks and ≤~2000 estimated tokens.
-   - Produce subquery answer (LLM) using **only** retained chunks.
+   - Produce subquery answer (LLM or grounded extractive summarizer) using **only** retained chunks.
    - Write episodic summary string to SQLite (and return in API).
 4. **Synthesize**: Final answer from episodic summaries + short retained excerpts.
 5. **Persist**: Full session row + subquery rows + memory action rows.

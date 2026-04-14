@@ -28,6 +28,10 @@ def test_research_pipeline_smoke() -> None:
         assert data["session_metrics"]["discard_breakdown"] is not None
         assert "reviewer_note" in data
         assert isinstance(data["episodic_summaries"], list)
+        assert "[Mock answer]" not in data["final_answer"]
+        assert "[Mock answer]" not in "\n".join(
+            r["subquery_answer"] for r in data["subquery_results"]
+        )
         assert data["constraints"]["max_subqueries"] == 3
         sid = data["session_id"]
         g = client.get(f"/session/{sid}")

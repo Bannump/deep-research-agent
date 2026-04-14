@@ -194,7 +194,8 @@ def _run_pipeline(original_query: str) -> ResearchResponse:
 
         epi = memory.summarize_episodic(sq, sub_ans, llm=llm)
         episodic_notes.append(epi)
-        evidence_for_final.extend([c.text[:600] for c in wm.retained[:2]])
+        for c in wm.retained[:4]:
+            evidence_for_final.append(f"[{c.source}]\n{c.text[:800]}")
 
         log_action(
             "episodic",

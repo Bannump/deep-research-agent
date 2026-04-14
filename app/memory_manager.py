@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from app.config import get_settings
-from app.llm import LLMProvider, get_llm_provider
+from app.grounded_synthesis import grounded_episodic_summary
+from app.llm import LLMProvider, MockLLMProvider, get_llm_provider
 from app.retriever import RetrievedChunk
 from app.utils import chunk_text_similarity_key, estimate_tokens, normalize_ws
 
@@ -119,13 +120,17 @@ class MemoryManager:
     ) -> str:
         """Compress subquery outcome into a short episodic note for SQLite."""
         llm = llm or get_llm_provider()
+        if isinstance(llm, MockLLMProvider):
+            return grounded_episodic_summary(subquery, answer)
+
         system = (
-            "Summarize the subquery result in 2-3 concise sentences for episodic memory. "
-            "No bullet points. Focus on claims and cited themes."
+            "Summarize the subquery result in 1-2 concise sentences for episodic memory. "
+            "Shorter than the full answer. No bullet points. "
+            "Keep concrete nouns (products, standards, control types). Do not add new facts."
         )
         user = f"Subquery: {subquery}\nAnswer:\n{answer[:4000]}\n"
         try:
             out = normalize_ws(llm.complete_text(system, user, max_tokens=256))
             return out[:1200]
         except Exception:
-            return normalize_ws(answer)[:800]
+            return grounded_episodic_summary(subquery, answer)

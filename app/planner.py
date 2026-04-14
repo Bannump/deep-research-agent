@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from app.config import get_settings
+from app.grounded_synthesis import sanitize_subqueries, strip_subquery_prefixes
 from app.llm import LLMProvider, get_llm_provider
 
 
@@ -58,11 +59,13 @@ def decompose_query(original_query: str, llm: LLMProvider | None = None) -> list
     if isinstance(raw_list, list):
         for item in raw_list:
             if isinstance(item, str):
-                s = item.strip()
-                if len(s) > 5:
-                    subqueries.append(s)
+                subqueries.append(item)
 
-    subqueries = subqueries[:max_n]
+    subqueries = sanitize_subqueries(subqueries, original_query, max_n)
     if len(subqueries) < 1:
-        subqueries = _fallback_subqueries(original_query, max_n)
+        cleaned = strip_subquery_prefixes(original_query)
+        subqueries = _fallback_subqueries(cleaned, max_n)
+        subqueries = sanitize_subqueries(subqueries, cleaned, max_n)
+    if len(subqueries) < 1 and strip_subquery_prefixes(original_query):
+        subqueries = [strip_subquery_prefixes(original_query)][:max_n]
     return subqueries[:max_n]
