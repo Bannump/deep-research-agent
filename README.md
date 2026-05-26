@@ -18,6 +18,30 @@ A **constrained research pipeline** (not a free-form chat agent) that answers mu
 
 ## System architecture
 
+```mermaid
+flowchart TD
+    N([n8n Webhook]) --> API
+    API([HTTP POST /research]) --> PL["Planner\nDecompose into ≤3 subqueries"]
+
+    PL --> LOOP
+
+    subgraph LOOP ["Per-subquery loop  ×1–3"]
+        RET["Retrieve\ntop-8 chunks"]
+        WM["Working Memory\ndedup · score filter\n≤4 chunks · ~2000 tok"]
+        ANS["LLM\nAnswer subquery"]
+        EPI["Episodic Compress\n→ 1–2 sentence note"]
+        RET --> WM --> ANS --> EPI
+    end
+
+    LOOP --> SYNTH["Final Synthesis\nepisodic notes + evidence → LLM"]
+    SYNTH --> OUT([Research Response JSON])
+
+    CHROMA[(ChromaDB\nlong-term evidence)] -->|query| RET
+    CHROMA -->|evidence snippets| SYNTH
+    EPI -->|write| SQLITE[(SQLite\nepisodic logs)]
+    SQLITE -->|accumulated notes| SYNTH
+```
+
 - **FastAPI** (`app/main.py`) runs the pipeline and persists sessions.
 - **Planner** (`app/planner.py`) emits up to **3** subqueries (LLM JSON with deterministic fallback).
 - **Retriever** (`app/retriever.py`) chunks `data/sample_docs`, embeds (Chroma default or mock for tests), returns up to **8** candidates per subquery.
