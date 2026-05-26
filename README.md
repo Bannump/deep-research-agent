@@ -1,4 +1,4 @@
-# Binox G3 — Deep Research Agent (Memory-Constrained Pipeline)
+# Deep Research Agent (Memory-Constrained Pipeline)
 
 A **constrained research pipeline** (not a free-form chat agent) that answers multi-part questions under explicit **retrieval**, **working-memory**, and **episodic** limits. It logs what was retrieved, retained, summarized, and discarded, and exposes results through **FastAPI** with optional **n8n** orchestration.
 
@@ -57,7 +57,7 @@ No `.env` file is required. Compose reads defaults from `docker-compose.yml`; op
 `docker compose --env-file .env up --build`
 
 ```bash
-cd binox-g3-research-agent
+cd deep-research-agent
 docker compose up --build
 ```
 
@@ -68,7 +68,7 @@ The API container stores SQLite + Chroma in the `research_data` volume under `/d
 
 ## Run locally (Python)
 
-From the project root (`binox-g3-research-agent`):
+From the project root (`deep-research-agent`):
 
 1. Create a venv and install dependencies:
 

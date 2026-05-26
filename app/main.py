@@ -76,7 +76,7 @@ async def _lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Binox G3 Deep Research Agent",
+    title="Deep Research Agent",
     version=__version__,
     lifespan=_lifespan,
 )

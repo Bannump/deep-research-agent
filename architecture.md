@@ -1,4 +1,4 @@
-# Architecture — Binox G3 Research Agent
+# Architecture — Deep Research Agent
 
 ## System overview
 
